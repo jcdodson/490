@@ -1,0 +1,97 @@
+{% extends 'myapp/base.html' %}
+
+{% block title %}{{ item_name }} Price Graph{% endblock %}
+
+{% block content %}
+<h1>{{ item_name }} Price Data</h1>
+
+<div id="chart-container">
+    <div id="chart"></div>
+</div>
+
+<script src="https://d3js.org/d3.v6.min.js"></script>
+
+<script>
+
+    const data = JSON.parse('{{ data | safe }}');
+
+    const avg_price = d3.mean(data, d => d.price);
+
+    const chart = () => {
+        const width = 928;
+        const height = 500;
+        const marginTop = 20;
+        const marginRight = 30;
+        const marginBottom = 70;
+        const marginLeft = 90;
+
+        //x scale
+        const x = d3.scaleUtc()
+            .domain(d3.extent(data, d => new Date(d.date)))
+            .range([marginLeft, width - marginRight]);
+
+        //y scale
+        const y = d3.scaleLinear()
+            .domain(d3.extent(data, d => d.price)).nice()
+            .range([height - marginBottom, marginTop]);
+
+        //line generator
+        const line = d3.line()
+            .curve(d3.curveStep)
+            .defined(d => !isNaN(d.price))
+            .x(d => x(new Date(d.date)))
+            .y(d => y(d.price));
+
+        //create SVG element and append it to the chart container
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("style", "max-width: 100%; height: auto; background-color: #e0d9b4;"); 
+
+        //define linear gradient for the line color
+        const gradient = svg.append("defs")
+            .append("linearGradient")
+            .attr("id", "line-gradient")
+            .attr("gradientUnits", "userSpaceOnUse")
+            .attr("x1", 0)
+            .attr("y1", 0)
+            .attr("x2", 0)
+            .attr("y2", height);
+
+        gradient.selectAll("stop")
+            .data([
+                {offset: y(avg_price) / height, color: "red"},
+                {offset: y(avg_price) / height, color: "black"}
+            ])
+            .join("stop")
+            .attr("offset", d => d.offset)
+            .attr("stop-color", d => d.color);
+
+        //append x axis
+        svg.append("g")
+            .attr("transform", `translate(0,${height - marginBottom})`)
+            .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+            .attr("color", "black");
+
+        //append y axis
+        svg.append("g")
+            .attr("transform", `translate(${marginLeft},0)`)
+            .call(d3.axisLeft(y))
+            .attr("color", "black"); 
+
+        //draw the line
+        svg.append("path")
+            .datum(data)
+            .attr("fill", "none")
+            .attr("stroke", "url(#line-gradient)")
+            .attr("stroke-width", 1.5)
+            .attr("stroke-linejoin", "round")
+            .attr("stroke-linecap", "round")
+            .attr("d", line);
+    };
+
+    chart();
+</script>
+{% endblock %}
