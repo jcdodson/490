@@ -1,21 +1,44 @@
 {% extends 'myapp/base.html' %}
+{% load humanize %}
+{% load static %}
 
-{% block title %}Home - OSRS Price Predictor{% endblock %}
+{% block title %}Home - GE Examiner{% endblock %}
 
 {% block content %}
-<h1>Top 3 Price Changes</h1>
-        <div class="row">
-            {% for item in top_items %}
-            <div class="col-md-4">
-                <a href="{% url 'price_graph' item_id=item.id %}" class="card-link"> <!-- Link to the price graph page -->
-                    <div class="card bg-dark text-light mb-3">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ item.name }}</h5>
-                            <p class="card-text">Price Change: {{ item.price_change|floatformat:0 }}</p>
-                        </div>
+<div class="border border-dark p-5">
+    <h1 class="mb-4" style="text-align: left;">Top 3 Price Changes (30d)</h1>
+    <div class="row text-start">
+        {% for item in top_items %}
+        <div class="col-md-4">
+            <a href="{% url 'price_graph' item_id=item.id %}" class="card-link">
+                <div class="card bg-dark text-light mb-3 border border-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ item.name }}</h5>
+                        <p class="card-text">Price Change: {{ item.price_change|floatformat:0|intcomma }}
+                        </p>
                     </div>
-                </a>
-            </div>
-            {% endfor %}
+                </div>
+            </a>
         </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="border border-dark p-5 mt-4" style="margin-bottom: 50px;">
+    <h1 class="mb-4" style="text-align: left;">Top 3 Traded Items (30d)</h1>
+    <div class="row text-start">
+        {% for item in top_traded_items %}
+        <div class="col-md-4">
+            <a href="{% url 'price_graph' item_id=item.id %}" class="card-link">
+                <div class="card bg-dark text-light mb-3 border border-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ item.name }}</h5>
+                        <p class="card-text">Total Traded: {{ item.total_traded|intcomma }}</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
 {% endblock %}

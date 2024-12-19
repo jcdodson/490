@@ -3,37 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}OSRS Price Predictor{% endblock %}</title>
+    <title>{% block title %}GE Examiner{% endblock %}</title>
     <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #2e2e2e;
-            color: #e0d9b4;
-        }
-        .navbar {
-            background-color: #5e5e5e;
-        }
-        .nav-link {
-            color: #e0d9b4 !important;
-        }
-        .form-control {
-            color: black !important;
-            background-color: white !important;
-        }
-        .form-control:focus {
-            background-color: white !important;
-            color: black !important;
-        }
-        .btn {
-            background-color: #e0d9b4 !important;
-            color: black !important;
-            border: none !important;
-        }
-        .btn:hover {
-            background-color: #d5c89f !important;
-        }
-    </style>
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    body {
+        background-color: #2e2e2e;
+        color: #e0d9b4;
+    }
+    .content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+    .navbar {
+        background-color: #5e5e5e;
+    }
+    .nav-link {
+        color: #e0d9b4 !important;
+    }
+    .form-control {
+        color: black !important;
+        background-color: white !important;
+    }
+    .form-control:focus {
+        background-color: white !important;
+        color: black !important;
+    }
+    .btn {
+        background-color: #e0d9b4 !important;
+        color: black !important;
+        border: none !important;
+    }
+    .btn:hover {
+        background-color: #d5c89f !important;
+    }
+    .card {
+        margin: 20px auto;
+        padding: 20px;
+        background-color: #fff;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        max-width: 95%;
+    }
+    .card h5 {
+    color: #F9DC5C;
+    }
+    .card p {
+    color: #d5c89f;
+    }
+    h1 {
+        text-align: center;
+        color: #d5c89f;
+    }
+    #chart-container30, #trade-chart-container30 {
+        margin: 30px auto;
+        padding: 10px;
+        border: 2px solid #5e5e5e;
+        border-radius: 8px;
+        max-width: 100%;
+        text-align: center;
+        box-sizing: border-box;
+    }
+    #chart-container7, #trade-chart-container7{
+        margin: 30px auto;
+        padding: 10px;
+        border: 2px solid #5e5e5e;
+        border-radius: 8px;
+        max-width: 100%;
+        text-align: center;
+        box-sizing: border-box;
+    }
+    #chart30, #trade-chart30{
+        width: 100%;
+        height: 100%;
+    }
+    #chart7, #trade-chart7{
+        width: 100%;
+        height: 100%;
+    }
+    summary {
+        color: #F9DC5C;
+    }
+    summary:hover {
+        color: rgb(250, 228, 164);
+        cursor: pointer;
+    }
+    footer {
+        background-color: #5e5e5e;
+        color: #e0d9b4;
+        text-align: center;
+        padding: 10px 0;
+        margin-top: 50px;
+    }
+</style>
 </head>
 <body>
     <!-- Navigation Bar -->
@@ -56,9 +127,15 @@
     </nav>
 
     <!-- Content Block -->
-    <div class="container mt-5">
+    <div class="content container mt-5">
         {% block content %}{% endblock %}
     </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2024 GE Examiner. All rights reserved.</p>
+        <p>Last scanned: {{ last_scanned }}</p>
+    </footer>
 
     <!-- Bootstrap JS and dependencies -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>

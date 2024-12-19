@@ -35,6 +35,7 @@ def insert_daily_prices_to_db(conn, item_id, daily_prices):
             query = """
                 INSERT INTO item_prices (item_id, avg_price, price_check_date)
                 VALUES (%s, %s, to_timestamp(%s))
+                ON CONFLICT (item_id, price_check_date) DO NOTHING;
             """
             cursor.execute(query, (item_id, avg_price, timestamp))
 

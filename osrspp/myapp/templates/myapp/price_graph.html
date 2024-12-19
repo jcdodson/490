@@ -1,38 +1,103 @@
 {% extends 'myapp/base.html' %}
 
-{% block title %}{{ item_name }} Price Graph{% endblock %}
+{% block title %}{{ item_name }} Data{% endblock %}
 
 {% block content %}
-<h1>{{ item_name }} Price Data</h1>
 
-<div id="chart-container">
-    <div id="chart"></div>
-</div>
+<!-- Expanding Section for 7d -->
+<details style="margin-top: 20px;">
+    <summary style="font-size: 1.5rem; cursor: pointer; outline: none;">
+        {{ item_name }} Data (7d)
+    </summary>
+
+    <div style="display: flex; justify-content: flex-start; align-items: flex-start; flex-wrap: nowrap; width: 100%; margin-top: 20px;">
+        <!-- Price Chart -->
+        <div id="chart-container7" style="flex: 1; margin: 10px; width: 90%; max-width: none;">
+            <div id="chart7"></div>
+        </div>
+
+        <!-- Trade Chart -->
+        <div id="trade-chart-container7" style="flex: 1; margin: 10px; width: 90%; max-width: none;">
+            <div id="trade-chart7"></div>
+        </div>
+    </div>
+</details>
+
+
+<!-- Expanding Section for 30d -->
+<details style="margin-top: 20px;" open>
+    <summary style="font-size: 1.5rem; cursor: pointer; outline: none;">
+        {{ item_name }} Data (30d)
+    </summary>
+
+    <!-- Charts Container -->
+    <div style="display: flex; justify-content: flex-start; align-items: flex-start; flex-wrap: nowrap; width: 100%; margin: left; margin-top: 20px;">
+        <!-- Price Chart -->
+        <div id="chart-container30" style="flex: 1; margin: 10px; width: 90%; max-width: none;">
+            <div id="chart30"></div>
+        </div>
+
+        <!-- Trade Chart -->
+        <div id="trade-chart-container30" style="flex: 1; margin: 10px; width: 90%; max-width: none;">
+            <div id="trade-chart30"></div>
+        </div>
+    </div>
+</details>
+
+<!-- Quick Stats Section -->
+<details style="margin-top: 20px;">
+    <summary style="font-size: 1.5rem; cursor: pointer; outline: none;">
+        Quick Stats
+    </summary>
+
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: nowrap; width: 100%; margin-top: 20px; border: 2px solid #5e5e5e; border-radius: 8px; padding: 20px; box-sizing: border-box;">
+        <!-- Column for 30-day stats -->
+        <div style="flex: 1; margin-right: 10px;">
+            <h4>Last 30 Days</h4>
+            <ul>
+                <li>Highest Price: {{ high_price_30 }}</li>
+                <li>Average Price: {{ avg_price_30 }}</li>
+                <li>Lowest Price: {{ low_price_30 }}</li>
+                <li>Total Traded: {{ total_traded_30 }}</li>
+            </ul>
+        </div>
+
+        <!-- Column for 7-day stats -->
+        <div style="flex: 1; margin-left: 10px;">
+            <h4>Last 7 Days</h4>
+            <ul>
+                <li>Highest Price: {{ high_price_7 }}</li>
+                <li>Average Price: {{ avg_price_7 }}</li>
+                <li>Lowest Price: {{ low_price_7 }}</li>
+                <li>Total Traded: {{ total_traded_7 }}</li>
+            </ul>
+        </div>
+    </div>
+</details>
 
 <script src="https://d3js.org/d3.v6.min.js"></script>
 
 <script>
+    //price chart data for graph
+    const data30p = JSON.parse('{{ price_data30 | safe }}');
+    const avg_price30p = d3.mean(data30p, d => d.price);
 
-    const data = JSON.parse('{{ data | safe }}');
-
-    const avg_price = d3.mean(data, d => d.price);
-
-    const chart = () => {
-        const width = 928;
-        const height = 500;
-        const marginTop = 20;
-        const marginRight = 30;
+    const chart30 = () => {
+        const width = document.getElementById("chart-container30").offsetWidth;
+        const height = window.innerHeight * 0.6;
+        const marginTop = 40;
+        const marginRight = 15;
         const marginBottom = 70;
         const marginLeft = 90;
 
         //x scale
         const x = d3.scaleUtc()
-            .domain(d3.extent(data, d => new Date(d.date)))
+            .domain(d3.extent(data30p, d => new Date(d.date)))
             .range([marginLeft, width - marginRight]);
 
         //y scale
         const y = d3.scaleLinear()
-            .domain(d3.extent(data, d => d.price)).nice()
+            .domain(d3.extent(data30p, d => d.price)).nice()
             .range([height - marginBottom, marginTop]);
 
         //line generator
@@ -43,12 +108,14 @@
             .y(d => y(d.price));
 
         //create SVG element and append it to the chart container
-        const svg = d3.select("#chart")
+        const svg = d3.select("#chart30")
+            .style("width", "fit-content")
+            .style("display", "inline-block")
             .append("svg")
             .attr("width", width)
             .attr("height", height)
             .attr("viewBox", `0 0 ${width} ${height}`)
-            .attr("style", "max-width: 100%; height: auto; background-color: #e0d9b4;"); 
+            .attr("style", "max-width: 100%; height: auto; background-color: #e0d9b4;");
 
         //define linear gradient for the line color
         const gradient = svg.append("defs")
@@ -62,36 +129,287 @@
 
         gradient.selectAll("stop")
             .data([
-                {offset: y(avg_price) / height, color: "red"},
-                {offset: y(avg_price) / height, color: "black"}
+                { offset: y(avg_price30p) / height, color: "red" },
+                { offset: y(avg_price30p) / height, color: "black" }
             ])
             .join("stop")
             .attr("offset", d => d.offset)
             .attr("stop-color", d => d.color);
 
-        //append x axis
+        //filter dates for x-axis labels
+        const filteredDates = data30p
+            .map(d => new Date(d.date))
+            .filter((_, i) => i % 3 === 0);
+
+        //append x axis with filtered dates
         svg.append("g")
             .attr("transform", `translate(0,${height - marginBottom})`)
-            .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0))
+            .call(d3.axisBottom(x)
+                .tickValues(filteredDates)
+                .tickFormat(d3.timeFormat("%m/%d"))
+                .tickSizeOuter(0))
             .attr("color", "black");
 
-        //append y axis
+        // append y axis
         svg.append("g")
             .attr("transform", `translate(${marginLeft},0)`)
             .call(d3.axisLeft(y))
-            .attr("color", "black"); 
+            .attr("color", "black");
 
-        //draw the line
+        // draw the line
         svg.append("path")
-            .datum(data)
+            .datum(data30p)
             .attr("fill", "none")
             .attr("stroke", "url(#line-gradient)")
             .attr("stroke-width", 1.5)
             .attr("stroke-linejoin", "round")
             .attr("stroke-linecap", "round")
             .attr("d", line);
+
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", marginTop / 2 + 5)
+            .attr("text-anchor", "middle")
+            .style("font-size", "1rem")
+            .text("Average Daily Price");
+    };
+    chart30();
+
+    //data for the trade graph
+    const tradeData30 = JSON.parse('{{ trade_data30 | safe }}');
+
+    const tradeChart30 = () => {
+        const width = document.getElementById("trade-chart-container30").offsetWidth;
+        const height = window.innerHeight * 0.6; 
+        const marginTop = 40;
+        const marginRight = 15;
+        const marginBottom = 70;
+        const marginLeft = 90;
+
+        //define x and y scales
+        const x = d3.scaleBand()
+            .domain(tradeData30.map(d => new Date(d.date)))
+            .range([marginLeft, width - marginRight])
+            .padding(0.1);
+
+        const y = d3.scaleLinear()
+            .domain([0, d3.max(tradeData30, d => d.volume)]).nice()
+            .range([height - marginBottom, marginTop]);
+
+        //create SVG container
+        const svg = d3.select("#trade-chart30")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("style", "max-width: 100%; height: auto; background-color: #e0d9b4;");
+
+        //add bars
+        svg.append("g")
+            .attr("fill", "steelblue")
+            .selectAll("rect")
+            .data(tradeData30)
+            .join("rect")
+            .attr("x", d => x(new Date(d.date)))
+            .attr("y", d => y(d.volume))
+            .attr("height", d => y(0) - y(d.volume))
+            .attr("width", x.bandwidth());
+
+        //add x-axis with filtered dates
+        const filteredDates = tradeData30
+            .map(d => new Date(d.date))
+            .filter((_, i) => i % 3 === 0);
+
+        svg.append("g")
+            .attr("transform", `translate(0,${height - marginBottom})`)
+            .call(d3.axisBottom(x)
+                .tickValues(filteredDates)
+                .tickFormat(d3.timeFormat("%m/%d"))
+                .tickSizeOuter(1))
+            .attr("color", "black")
+            .call(g => g.select(".domain").attr("stroke", "black"));
+
+        //add y-axis
+        svg.append("g")
+            .attr("transform", `translate(${marginLeft},0)`)
+            .call(d3.axisLeft(y))
+            .call(g => g.select(".domain"))
+            .attr("color", "black");
+
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", marginTop / 2 + 5)
+            .attr("text-anchor", "middle")
+            .style("font-size", "1rem")
+            .text("Daily Traded Amount");
     };
 
-    chart();
+    tradeChart30();
+</script>
+<script>
+    //7 day script
+    const data7p = JSON.parse('{{ price_data7 | safe }}');
+    const avg_price7p = d3.mean(data7p, d => d.price);
+
+    const chart7 = () => {
+        const width = document.getElementById("chart-container7").offsetWidth;
+        const height = window.innerHeight * 0.6;
+        const marginTop = 40;
+        const marginRight = 15;
+        const marginBottom = 70;
+        const marginLeft = 90;
+
+        //x scale
+        const x = d3.scaleUtc()
+            .domain(d3.extent(data7p, d => new Date(d.date)))
+            .range([marginLeft, width - marginRight]);
+
+        //y scale
+        const y = d3.scaleLinear()
+            .domain(d3.extent(data7p, d => d.price)).nice()
+            .range([height - marginBottom, marginTop]);
+
+        //line generator
+        const line = d3.line()
+            .curve(d3.curveStep)
+            .defined(d => !isNaN(d.price))
+            .x(d => x(new Date(d.date)))
+            .y(d => y(d.price));
+
+        //create SVG element and append it to the chart container
+        const svg = d3.select("#chart7")
+            .style("width", "fit-content")
+            .style("display", "inline-block")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("style", "max-width: 100%; height: auto; background-color: #e0d9b4;");
+
+        //define linear gradient for the line color
+        const gradient = svg.append("defs")
+            .append("linearGradient")
+            .attr("id", "line-gradient7")
+            .attr("gradientUnits", "userSpaceOnUse")
+            .attr("x1", 0)
+            .attr("y1", 0)
+            .attr("x2", 0)
+            .attr("y2", height);
+
+        gradient.selectAll("stop")
+            .data([
+                { offset: y(avg_price7p) / height, color: "red" },
+                { offset: y(avg_price7p) / height, color: "black" }
+            ])
+            .join("stop")
+            .attr("offset", d => d.offset)
+            .attr("stop-color", d => d.color);
+
+        //filter dates for x-axis labels
+        const filteredDates = data7p
+            .map(d => new Date(d.date))
+            .filter((_, i) => i % 3 === 0);
+
+        //append x axis with filtered dates
+        svg.append("g")
+            .attr("transform", `translate(0,${height - marginBottom})`)
+            .call(d3.axisBottom(x)
+                .tickValues(filteredDates)
+                .tickFormat(d3.timeFormat("%m/%d"))
+                .tickSizeOuter(0))
+            .attr("color", "black");
+
+        // append y axis
+        svg.append("g")
+            .attr("transform", `translate(${marginLeft},0)`)
+            .call(d3.axisLeft(y))
+            .attr("color", "black");
+
+        // draw the line
+        svg.append("path")
+            .datum(data7p)
+            .attr("fill", "none")
+            .attr("stroke", "url(#line-gradient7)")
+            .attr("stroke-width", 1.5)
+            .attr("stroke-linejoin", "round")
+            .attr("stroke-linecap", "round")
+            .attr("d", line);
+        
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", marginTop / 2 + 5)
+            .attr("text-anchor", "middle")
+            .style("font-size", "1rem")
+            .text("Average Daily Price");
+    };
+    chart7();
+
+    const tradeData7 = JSON.parse('{{ trade_data7 | safe }}');
+    const tradeChart7 = () => {
+        const width = document.getElementById("trade-chart-container7").offsetWidth;
+        const height = window.innerHeight * 0.6; 
+        const marginTop = 40;
+        const marginRight = 15;
+        const marginBottom = 70;
+        const marginLeft = 90;
+
+        //define x and y scales
+        const x = d3.scaleBand()
+            .domain(tradeData7.map(d => new Date(d.date)))
+            .range([marginLeft, width - marginRight])
+            .padding(0.1);
+
+        const y = d3.scaleLinear()
+            .domain([0, d3.max(tradeData7, d => d.volume)]).nice()
+            .range([height - marginBottom, marginTop]);
+
+        //create SVG container
+        const svg = d3.select("#trade-chart7")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("style", "max-width: 100%; height: auto; background-color: #e0d9b4;");
+
+        //add bars
+        svg.append("g")
+            .attr("fill", "steelblue")
+            .selectAll("rect")
+            .data(tradeData7)
+            .join("rect")
+            .attr("x", d => x(new Date(d.date)))
+            .attr("y", d => y(d.volume))
+            .attr("height", d => y(0) - y(d.volume))
+            .attr("width", x.bandwidth());
+
+        //add x-axis with filtered dates
+        const filteredDates = tradeData7
+            .map(d => new Date(d.date))
+            .filter((_, i) => i % 3 === 0);
+
+        svg.append("g")
+            .attr("transform", `translate(0,${height - marginBottom})`)
+            .call(d3.axisBottom(x)
+                .tickValues(filteredDates)
+                .tickFormat(d3.timeFormat("%m/%d"))
+                .tickSizeOuter(1))
+            .attr("color", "black")
+            .call(g => g.select(".domain").attr("stroke", "black"));
+
+        //add y-axis
+        svg.append("g")
+            .attr("transform", `translate(${marginLeft},0)`)
+            .call(d3.axisLeft(y))
+            .call(g => g.select(".domain"))
+            .attr("color", "black");
+
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", marginTop / 2 + 5)
+            .attr("text-anchor", "middle")
+            .style("font-size", "1rem")
+            .text("Daily Traded Amount");
+    };
+    tradeChart7();
 </script>
 {% endblock %}

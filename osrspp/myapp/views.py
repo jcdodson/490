@@ -11,10 +11,10 @@ def search_item(request):
         item_name = request.GET.get('item_name')
 
         if not item_name:
-            return HttpResponse("Please enter an item name to search.")
+            return render(request, 'myapp/search_results.html', {'error_message': "Please enter an item name to search."})
 
         try:
-            #db connection
+            #connect to db
             conn = psycopg2.connect(
                 dbname="postgres",
                 user="postgres",
@@ -26,27 +26,34 @@ def search_item(request):
             #strip user input
             item_name = item_name.strip()
 
-            #db query for the item_id based on the item _ame
+            #db query for items
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT item_id FROM items 
+                SELECT item_id, item_name FROM items 
                 WHERE TRIM(item_name) ILIKE %s;
-            """, (f"%{item_name}%",))  #case-insensitive search with partial match
+            """, (f"%{item_name}%",))  #case-insensitive with partial match
 
-            result = cursor.fetchone()
+            results = cursor.fetchall()
             cursor.close()
             conn.close()
 
-            if not result:
-                return HttpResponse("Item not found.")
+            if not results:
+                #render the search results page with an error message
+                return render(request, 'myapp/search_results.html', {
+                    'error_message': "No items found",
+                    'results': None
+                })
 
-            item_id = result[0]
+            if len(results) == 1:
+                #redirect directly to the price graph
+                item_id = results[0][0]
+                return redirect('price_graph', item_id=item_id)
 
-            #redirect to a dynamic URL to render the price graph for the item
-            return redirect('price_graph', item_id=item_id)
+            #if multiple results, render the search results page with the items
+            return render(request, 'myapp/search_results.html', {'results': results})
 
         except Exception as e:
-            return HttpResponse(f"An error occurred: {str(e)}")
+            return render(request, 'myapp/search_results.html', {'error_message': f"An error occurred: {str(e)}", 'results': None})
 
 
 def price_graph2(request, item_id):
@@ -66,10 +73,9 @@ def price_graph2(request, item_id):
     return render(request, 'myapp/price_graph.html', context)
 
 
-# View to render the price graph for a specific item based on its item_id
+#price graph for a specific item based on its item_id
 def price_graph(request, item_id):
     try:
-        #db connection
         conn = psycopg2.connect(
             dbname="postgres",
             user="postgres",
@@ -80,46 +86,123 @@ def price_graph(request, item_id):
 
         cursor = conn.cursor()
 
-        #get item_name
+        #getting item_name
         cursor.execute("SELECT item_name FROM items WHERE item_id = %s;", (item_id,))
         item_name_result = cursor.fetchone()
         if not item_name_result:
             return HttpResponse("Item not found.")
         item_name = item_name_result[0]
 
-        #db query to get historical prices
+        #define 30 day timeframe
+        thirty_days_ago = timezone.now().date() - timedelta(days=30)
+
+        #query price for last 30 days
         cursor.execute("""
             SELECT price_check_date, avg_price 
             FROM item_prices 
-            WHERE item_id = %s
+            WHERE item_id = %s AND price_check_date >= %s
             ORDER BY price_check_date;
-        """, (item_id,))
-        results = cursor.fetchall()
+        """, (item_id, thirty_days_ago))
+        price_results30 = cursor.fetchall()
+
+        #query trade data for last 30 days
+        cursor.execute("""
+            SELECT price_check_date, daily_traded 
+            FROM item_trades 
+            WHERE item_id = %s AND price_check_date >= %s
+            ORDER BY price_check_date;
+        """, (item_id, thirty_days_ago))
+        trade_results30 = cursor.fetchall()
+
+        seven_days_ago = timezone.now().date() - timedelta(days=7)
+
+        #query price data for last 7 days
+        cursor.execute("""
+            SELECT price_check_date, avg_price 
+            FROM item_prices 
+            WHERE item_id = %s AND price_check_date >= %s
+            ORDER BY price_check_date;
+        """, (item_id, seven_days_ago))
+        price_results7 = cursor.fetchall()
+
+        #query trade data for last 7 days
+        cursor.execute("""
+            SELECT price_check_date, daily_traded 
+            FROM item_trades 
+            WHERE item_id = %s AND price_check_date >= %s
+            ORDER BY price_check_date;
+        """, (item_id, seven_days_ago))
+        trade_results7 = cursor.fetchall()
+
+        #get most recent scan info
+        cursor.execute("""
+            SELECT MAX(price_check_date)
+            FROM item_prices;
+        """)
+        last_scanned_result = cursor.fetchone()
+        last_scanned = last_scanned_result[0] if last_scanned_result[0] else None
+
         cursor.close()
         conn.close()
 
-        if not results:
-            return HttpResponse("No data available for this item.")
+        if not price_results30:
+            return HttpResponse("No price data available for this item.")
+        if not trade_results30:
+            return HttpResponse("No trade data available for this item.")
+        #if not price_results7:
+        #    return HttpResponse("No price7 data available for this item.")
+        #if not trade_results7:
+        #    return HttpResponse("No trade7 data available for this item.")
 
-        #converting data into JSON format for frontend use
-        data = [{"date": row[0].strftime('%Y-%m-%d'), "price": float(row[1])} for row in results]
+        #format scanned information
+        if last_scanned:
+            last_scanned = timezone.make_aware(last_scanned)
+            time_since_last_scan = timezone.now() - last_scanned
+            last_scanned_display = f"{time_since_last_scan.days} day(s) ago" if time_since_last_scan.days > 24 else "Today"
+        else:
+            last_scanned_display = "Never"
 
-        #calcing the overall average price
-        avg_price = float(mean([row[1] for row in results]))
+        #prepare datasets
+        price_data30 = [{"date": row[0].strftime('%Y-%m-%d'), "price": float(row[1])} for row in price_results30]
+        trade_data30 = [{"date": row[0].strftime('%Y-%m-%d'), "volume": int(row[1])} for row in trade_results30]
+        price_data7 = [{"date": row[0].strftime('%Y-%m-%d'), "price": float(row[1])} for row in price_results7]
+        trade_data7 = [{"date": row[0].strftime('%Y-%m-%d'), "volume": int(row[1])} for row in trade_results7]
 
-        #data, item_name, and the average price passed to the template
+        # Compute stats for 30 days
+        avg_price_30 = round(mean([d[1] for d in price_results30]))
+        high_price_30 = round(max([d[1] for d in price_results30]))
+        low_price_30 = round(min([d[1] for d in price_results30]))
+        total_traded_30 = sum([d[1] for d in trade_results30])
+
+        # Compute stats for 7 days
+        avg_price_7 = round(mean([d[1] for d in price_results7]))
+        high_price_7 = round(max([d[1] for d in price_results7]))
+        low_price_7 = round(min([d[1] for d in price_results7]))
+        total_traded_7 = sum([d[1] for d in trade_results7])
+
+        # Pass the stats to the template
         return render(request, 'myapp/price_graph.html', {
-            'data': json.dumps(data),
-            'avg_price': avg_price,
-            'item_name': item_name
+            'price_data30': json.dumps(price_data30),
+            'trade_data30': json.dumps(trade_data30),
+            'price_data7': json.dumps(price_data7),
+            'trade_data7': json.dumps(trade_data7),
+            'item_name': item_name,
+            'last_scanned': last_scanned_display,
+            'avg_price_30': avg_price_30,
+            'high_price_30': high_price_30,
+            'low_price_30': low_price_30,
+            'total_traded_30': total_traded_30,
+            'avg_price_7': avg_price_7,
+            'high_price_7': high_price_7,
+            'low_price_7': low_price_7,
+            'total_traded_7': total_traded_7,
         })
 
     except Exception as e:
         return HttpResponse(f"An error occurred: {str(e)}")
-
+        
 def index(request):
     try:
-        #db connection
         conn = psycopg2.connect(
             dbname="postgres",
             user="postgres",
@@ -128,12 +211,26 @@ def index(request):
             port="5432"
         )
 
-        #getting current date and the date 30 days ago
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT MAX(price_check_date)
+            FROM item_prices;
+        """)
+        last_scanned_result = cursor.fetchone()
+        last_scanned = last_scanned_result[0] if last_scanned_result[0] else None
+
+        if last_scanned:
+            last_scanned = timezone.make_aware(last_scanned)
+            time_since_last_scan = timezone.now() - last_scanned
+            last_scanned_display = f"{time_since_last_scan.days} day(s) ago" if time_since_last_scan.days > 24 else "Today"
+        else:
+            last_scanned_display = "Never"
+
+        #query for top items in last 30 days
         now = timezone.now().date()
         thirty_days_ago = now - timedelta(days=30)
 
-        #query the top 3 items with the biggest average price change in the last 30 days
-        cursor = conn.cursor()
         cursor.execute("""
             SELECT i.item_id, i.item_name, (MAX(p.avg_price) - MIN(p.avg_price)) AS price_change
             FROM items i
@@ -143,16 +240,37 @@ def index(request):
             ORDER BY price_change DESC
             LIMIT 3;
         """, (thirty_days_ago,))
+        top_price_changes = cursor.fetchall()
 
-        top_items = cursor.fetchall()
+        cursor.execute("""
+            SELECT i.item_id, i.item_name, SUM(t.daily_traded) AS total_traded
+            FROM items i
+            JOIN item_trades t ON i.item_id = t.item_id
+            WHERE t.price_check_date >= %s
+            GROUP BY i.item_id, i.item_name
+            ORDER BY total_traded DESC
+            LIMIT 3;
+        """, (thirty_days_ago,))
+        top_traded_items = cursor.fetchall()
+
         cursor.close()
         conn.close()
 
-        #data prepared to be passed to the template
-        items = [{'id': item[0], 'name': item[1], 'price_change': item[2]} for item in top_items]
+        price_change_items = [
+            {'id': item[0], 'name': item[1], 'price_change': item[2]}
+            for item in top_price_changes
+        ]
 
-        #top 3 items passed to the template
-        return render(request, 'myapp/home.html', {'top_items': items})
+        traded_items = [
+            {'id': item[0], 'name': item[1], 'total_traded': item[2]}
+            for item in top_traded_items
+        ]
+
+        return render(request, 'myapp/home.html', {
+            'top_items': price_change_items,
+            'top_traded_items': traded_items,
+            'last_scanned': last_scanned_display
+        })
 
     except Exception as e:
         return HttpResponse(f"An error occurred: {str(e)}")
